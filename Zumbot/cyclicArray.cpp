@@ -1,6 +1,6 @@
 //#include <arduino.h> //for debugging purposes ONLY
 
-template<typename T> class CyclicArray
+template<typename T> class cyclicArray
 {
   private:
     T* arr;
@@ -27,12 +27,12 @@ template<typename T> class CyclicArray
       return &arr[(curr + index + len) % len];
     }
   public:
-    CyclicArray<T>(int _length): len(_length) {
+    cyclicArray<T>(int _length): len(_length) {
       arr = new T[_length];
       curr = 0;
       dataLen = 0;
     }
-    CyclicArray<T>(int _length, T _default): len(_length) {
+    cyclicArray<T>(int _length, T _default): len(_length) {
       arr = new T[_length];
       curr = 0;
       dataLen = 0;
@@ -40,7 +40,7 @@ template<typename T> class CyclicArray
         arr[i] = _default;
       }
     }
-    ~CyclicArray() {
+    ~cyclicArray() {
       delete []arr;
     }
     T operator[](int i) {

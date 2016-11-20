@@ -5,14 +5,13 @@
 #include <ZumoMotors.h>
 #include <Pushbutton.h>
 #include <QTRSensors.h>
-//#include <ZumoReflectanceSensorArray.h>
-//#include <Servo.h>
 ZumoMotors motors;
 //ZumoBuzzer buzzer;
 FuncQueHandler factory;
 cameraHandler vision;
 ServoTimer2 serv;
 unsigned long panicTime = 0;
+
 
 void setup() {
   pinMode(4, INPUT);
@@ -27,9 +26,10 @@ void setup() {
   Serial.println("c2");
   butt.waitForButton();
   pinMode(3, OUTPUT);
+  pinMode(13,OUTPUT);
   factory.make_thread(periodic, 1, &visionHandler);
   factory.make_thread(periodic, 50, &debugging);
-  factory.make_thread(periodic, 50, &borderCheck);
+  factory.make_thread(periodic, 3, &borderCheck);
 }
 
 void loop() {
@@ -37,42 +37,29 @@ void loop() {
 }
 
 void visionHandler() {
-  Serial.println("I see!");
   vision.tic();
 }
 
 void debugging() {
+  digitalWrite(13,vision.enemyInView);
   if (panicTime < millis()) {
     if (vision.enemyInView ) {
-      //Serial.print("FOUND: "); Serial.println(vision.enemyAngle);
       if (vision.enemyAngle - vision.enemyWidth > 110) {
-        motors.setSpeeds(200, 100 );
+        motors.setSpeeds(200, -100 );
+      } else if (vision.enemyAngle + vision.enemyWidth < 70) {
+        motors.setSpeeds(-100, 200);
       } else {
-        if (vision.enemyAngle + vision.enemyWidth < 70) {
-          motors.setSpeeds(100, 200);
-        } else {
-          motors.setSpeeds(400, 400);
-        }
+        motors.setSpeeds(400, 400);
       }
     } else {
-      motors.setSpeeds(-100, 100);
-      //Serial.println("Nothing!");
+      motors.setSpeeds(400, -100);
     }
   } else {
     motors.setSpeeds(-400, -400);
   }
 }
-
 void borderCheck() {
-  unsigned char pins [] = {4, 5};
-  QTRSensorsRC qtrs(pins, 2, 500, QTR_NO_EMITTER_PIN);
-  unsigned int sensorArr[2];
-  Serial.print("start");Serial.flush();
-  qtrs.read(sensorArr);
-  Serial.print("end");Serial.flush();
-  if (sensorArr[0] < 500 || sensorArr[1] < 500) {
-    motors.setSpeeds(-400, -400);
-    panicTime = millis()+250;
+  if (analogRead(1) > 500 || analogRead(2) > 500) {
+    panicTime = millis() + 500;
   }
-  Serial.print(sensorArr[0]);Serial.print("  ");Serial.println(sensorArr[1]);Serial.flush();
 }
