@@ -1,65 +1,63 @@
-#include "STL.h"
-#include "FuncQueHandler.cpp"
-#include "CamHandler.cpp"
-//#include <ZumoBuzzer.h>
+#include "FuncQueHandler.h"
+#include "cameraHandler.h"
+#include "borderCheckHandler.h"
 #include <ZumoMotors.h>
 #include <Pushbutton.h>
-#include <QTRSensors.h>
+
+const unsigned char digital_visionServo = 2;        //which pin the cameraservo is connected to
+const unsigned char analog_visionSensor = 0;        //which pin the "camera" sensor is connected to
+const unsigned char analog_borderLeft = 1;          //which pin the leftmost bordersensor is connected to
+const unsigned char analog_borderRight = 2;         //which pin the rightmost bordersensor is connected to
+const unsigned char digital_hasTargetLED = 13;      //which pin the LED to indicate that an target is aquired is connected to
+
+const unsigned int panicDuration = 500;             //for how long the bot should panic after detecting an edge
+const unsigned char acceptableRammingDeviation = 10; //how large an deviation is acceptable for ramming
+
 ZumoMotors motors;
-//ZumoBuzzer buzzer;
-FuncQueHandler factory;
 cameraHandler vision;
-ServoTimer2 serv;
+borderCheckHandler border(analog_borderLeft, analog_borderRight);
+Pushbutton butt(ZUMO_BUTTON);
+
 unsigned long panicTime = 0;
 
-
 void setup() {
-  pinMode(4, INPUT);
-  pinMode(5, INPUT);
   Serial.begin(9600);
-  Pushbutton butt(ZUMO_BUTTON);
   butt.waitForButton();
-  vision.attach(2, 0);
+  pinMode(digital_hasTargetLED, OUTPUT);
+  configureVision();
   butt.waitForButton();
-  Serial.println("calibrate");
-  vision.calibrate();
-  Serial.println("c2");
-  butt.waitForButton();
-  pinMode(3, OUTPUT);
-  pinMode(13,OUTPUT);
-  factory.make_thread(periodic, 1, &visionHandler);
+  //play music for 5 seconds
+  factory.make_thread(periodic, 1, &visionTic);       //factory is a functionqueuer found in the "FuncQueHandler"-files, adds the visionTic-function to be executed periodically every 1 milliseconds
   factory.make_thread(periodic, 50, &debugging);
-  factory.make_thread(periodic, 3, &borderCheck);
 }
 
-void loop() {
-  factory.tic();
+void configureVision() {
+  vision.attach(digital_visionServo, analog_visionSensor); //attaches servo and stores what analogpin the sensor is connected to
+  vision.calibrate();  //performes a sweep to calibrate the sensor
 }
 
-void visionHandler() {
-  vision.tic();
+void visionTic() {
+  vision.tic(); //cannot reference memberfunctions, which is why this local function executing the memberfunction is here
 }
 
 void debugging() {
-  digitalWrite(13,vision.enemyInView);
+  digitalWrite(digital_hasTargetLED, vision.enemyInView);
+  if (border.left() || border.right()) {
+    panicTime = millis() + panicDuration;
+  }
   if (panicTime < millis()) {
-    if (vision.enemyInView ) {
-      if (vision.enemyAngle - vision.enemyWidth > 110) {
+    if (!vision.enemyInView ) {
+      motors.setSpeeds(400, -100);
+    } else {
+      if (vision.enemyAngle - vision.enemyWidth > 90 + acceptableRammingDeviation) {
         motors.setSpeeds(200, -100 );
-      } else if (vision.enemyAngle + vision.enemyWidth < 70) {
+      } else if (vision.enemyAngle + vision.enemyWidth < 90 - acceptableRammingDeviation) {
         motors.setSpeeds(-100, 200);
       } else {
         motors.setSpeeds(400, 400);
       }
-    } else {
-      motors.setSpeeds(400, -100);
     }
   } else {
     motors.setSpeeds(-400, -400);
-  }
-}
-void borderCheck() {
-  if (analogRead(1) > 500 || analogRead(2) > 500) {
-    panicTime = millis() + 500;
   }
 }
